@@ -1,4 +1,4 @@
-package dbfs
+package blob
 
 import (
 	"crypto/sha256"

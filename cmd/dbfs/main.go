@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -10,7 +13,7 @@ import (
 	"os"
 
 	"github.com/andrebq/dbfs"
-	"github.com/andrebq/dbfs/seek"
+	"github.com/andrebq/dbfs/blob"
 )
 
 var (
@@ -27,19 +30,21 @@ var (
 	
 	Apart from raw (which uses 0 as separator), all other encodings include a new line after each reference`)
 
+	outEncoding = flag.String("outEncoding", "raw", `Encoding used to print data to stdout, same options as -encoding`)
+
 	dir = flag.String("dir", "", "Directory to use for blob storage")
 	ns  = flag.String("ns", "", "Namespace used to isolate blob stores from each other")
 )
 
 func main() {
 	flag.Parse()
-	cas, err := dbfs.OpenFileCAS(*dir, *ns)
+	cas, err := blob.OpenFileCAS(*dir, *ns)
 	if err != nil {
 		log.Fatalf("Unable to open CAS file with the given parameter: %v", err)
 	}
 	switch *action {
 	case "get":
-		doGet()
+		doGet(cas)
 	case "put":
 		doPut(cas)
 	case "list":
@@ -49,8 +54,8 @@ func main() {
 	}
 }
 
-func doList(cas dbfs.CAS) {
-	out := make(chan dbfs.Ref, 1000)
+func doList(cas blob.CAS) {
+	out := make(chan blob.Ref, 1000)
 	err := make(chan error, 1)
 	go cas.List(out, err)
 	for {
@@ -69,7 +74,7 @@ func doList(cas dbfs.CAS) {
 	}
 }
 
-func writeRef(out io.Writer, ref *dbfs.Ref) error {
+func writeRef(out io.Writer, ref *blob.Ref) error {
 	var err error
 	switch *encoding {
 	case "base64u":
@@ -88,16 +93,43 @@ func writeRef(out io.Writer, ref *dbfs.Ref) error {
 	return err
 }
 
-func doGet() {
-	log.Fatal("get not implemented")
+func readRef(ref *blob.Ref, in io.Reader) error {
+	sc := bufio.NewScanner(in)
+	for sc.Scan() {
+		switch *encoding {
+		case "hex":
+			_, err := hex.Decode(ref[:], sc.Bytes())
+			return err
+		default:
+			return errors.New("encoding not yet implemented for read operations")
+		}
+	}
+	return sc.Err()
 }
 
-func doPut(cas dbfs.CAS) {
-	seekable := seek.CopyToTemp(os.Stdin)
-	defer seekable.Close()
-	ref, err := cas.Put(seekable)
+func doGet(cas blob.CAS) {
+	var ref blob.Ref
+	err := readRef(&ref, os.Stdin)
 	if err != nil {
-		log.Fatalf("cas.Put failed with %v", err)
+		log.Fatal(err)
+	}
+	out := &bytes.Buffer{}
+	err = cas.Copy(out, ref)
+	if err != nil {
+		log.Fatal(err)
+	}
+	switch *outEncoding {
+	case "hex":
+		os.Stdout.WriteString(hex.EncodeToString(out.Bytes()))
+	case "raw":
+		os.Stdout.Write(out.Bytes())
+	}
+}
+
+func doPut(cas blob.CAS) {
+	ref, err := dbfs.WriteFile(cas, os.Stdin)
+	if err != nil {
+		log.Fatal("Unable to save file to dbfs", err)
 	}
 	writeRef(os.Stdout, &ref)
 }

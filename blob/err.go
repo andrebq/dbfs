@@ -1,4 +1,4 @@
-package dbfs
+package blob
 
 import (
 	"errors"
