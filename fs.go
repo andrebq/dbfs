@@ -18,6 +18,11 @@ type (
 	FilterFunc func(afero.Fs, string, os.FileInfo) (bool, error)
 )
 
+const (
+	// DefaultBlobStorage is the name of the folder/file used to store blobs
+	DefaultBlobStorage = ".blob-storage"
+)
+
 // CopyFile reads the content from r into cas using WriteFile under the hood
 func CopyFile(cas blob.CAS, fs afero.Fs, path string) (blob.Ref, error) {
 	f, err := fs.Open(path)
@@ -121,4 +126,57 @@ func (ff FilterFunc) Call(fs afero.Fs, path string, info os.FileInfo) (bool, err
 		return true, nil
 	}
 	return ff(fs, path, info)
+}
+
+// SkipSCMFolders will skip the most common scm folders (git,mercurial,svn,bazar)
+func SkipSCMFolders(_ afero.Fs, path string, _ os.FileInfo) (bool, error) {
+	switch filepath.Base(path) {
+	case ".hg", ".git", ".svn", ".bzr":
+		return false, nil
+	}
+	return true, nil
+}
+
+// SkipDefaultBlobStore ignores the directory which is usually used as blob storage
+func SkipDefaultBlobStore(_ afero.Fs, path string, _ os.FileInfo) (bool, error) {
+	if filepath.Base(path) == DefaultBlobStorage {
+		return false, nil
+	}
+	return true, nil
+}
+
+// DefaultFilter is a syntatic sugar for Combine(SkipDefaultBlobStorage, SkipSCMFolders)
+func DefaultFilter() FilterFunc {
+	return Combine(SkipDefaultBlobStore, SkipSCMFolders)
+}
+
+// Combine takes a list of filters and return a function which will return true
+// only if all filters in the list return true.
+//
+// The evaluation stops at the first error
+func Combine(filters ...FilterFunc) FilterFunc {
+	return FilterFunc(func(fs afero.Fs, path string, info os.FileInfo) (bool, error) {
+		for _, f := range filters {
+			valid, err := f.Call(fs, path, info)
+			if err != nil {
+				return false, err
+			}
+			if !valid {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+// Not takes a filter function and returns the opposite,
+// any errors are passed without modification
+func Not(f FilterFunc) FilterFunc {
+	return FilterFunc(func(fs afero.Fs, path string, info os.FileInfo) (bool, error) {
+		v, err := f(fs, path, info)
+		if err != nil {
+			return false, err
+		}
+		return !v, nil
+	})
 }

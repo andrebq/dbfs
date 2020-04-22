@@ -34,7 +34,7 @@ var (
 
 	outEncoding = flag.String("outEncoding", "raw", `Encoding used to print data to stdout, same options as -encoding`)
 
-	blobDir  = flag.String("blobDir", "", "Directory to use for blob storage")
+	blobDir  = flag.String("blobDir", dbfs.DefaultBlobStorage, "Directory to use for blob storage")
 	inputDir = flag.String("inputDir", "", "Directory to scan and upload to blob storage")
 	ns       = flag.String("ns", "", "Namespace used to isolate blob stores from each other")
 )
@@ -140,7 +140,10 @@ func doPut(cas blob.CAS) {
 }
 
 func doPutDir(cas blob.CAS) {
-	ref, err := dbfs.WriteDir(cas, afero.NewReadOnlyFs(afero.NewOsFs()), *inputDir, nil)
+	ref, err := dbfs.WriteDir(cas,
+		afero.NewReadOnlyFs(afero.NewOsFs()),
+		*inputDir,
+		dbfs.DefaultFilter())
 	if err != nil {
 		log.Fatal("Unable to save dir to dbfs", err)
 	}
