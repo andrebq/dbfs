@@ -79,3 +79,8 @@ func (nr NamedRefList) Len() int { return len(nr) }
 func (nr NamedRefList) Swap(i, j int) {
 	nr[i], nr[j] = nr[j], nr[i]
 }
+
+func (m *Meta) ToBlob() []byte {
+	buf, _ := cbor.Marshal(m, cbor.CTAP2EncOptions())
+	return buf
+}

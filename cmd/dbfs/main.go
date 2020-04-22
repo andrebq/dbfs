@@ -14,13 +14,15 @@ import (
 
 	"github.com/andrebq/dbfs"
 	"github.com/andrebq/dbfs/blob"
+	"github.com/spf13/afero"
 )
 
 var (
 	action = flag.String("action", "put", `Operation to execute
-	get: to return the content of a reference (if available)
-	put: to read from stdin, store in the database and return the reference
-	list: to list all references available (follows the directory transversal order)`)
+	   get: to return the content of a reference (if available)
+	   put: to read from stdin, store in the database and return the reference
+	putDir: process a directory and all of its children
+	  list: to list all references available (follows the directory transversal order)`)
 
 	encoding = flag.String("encoding", "hex", `Encoding to use when reading/writing blob refs
 	hex: to write hexadecimal
@@ -32,13 +34,14 @@ var (
 
 	outEncoding = flag.String("outEncoding", "raw", `Encoding used to print data to stdout, same options as -encoding`)
 
-	dir = flag.String("dir", "", "Directory to use for blob storage")
-	ns  = flag.String("ns", "", "Namespace used to isolate blob stores from each other")
+	blobDir  = flag.String("blobDir", "", "Directory to use for blob storage")
+	inputDir = flag.String("inputDir", "", "Directory to scan and upload to blob storage")
+	ns       = flag.String("ns", "", "Namespace used to isolate blob stores from each other")
 )
 
 func main() {
 	flag.Parse()
-	cas, err := blob.OpenFileCAS(*dir, *ns)
+	cas, err := blob.OpenFileCAS(*blobDir, *ns)
 	if err != nil {
 		log.Fatalf("Unable to open CAS file with the given parameter: %v", err)
 	}
@@ -47,6 +50,8 @@ func main() {
 		doGet(cas)
 	case "put":
 		doPut(cas)
+	case "putDir":
+		doPutDir(cas)
 	case "list":
 		doList(cas)
 	default:
@@ -130,6 +135,14 @@ func doPut(cas blob.CAS) {
 	ref, err := dbfs.WriteFile(cas, os.Stdin)
 	if err != nil {
 		log.Fatal("Unable to save file to dbfs", err)
+	}
+	writeRef(os.Stdout, &ref)
+}
+
+func doPutDir(cas blob.CAS) {
+	ref, err := dbfs.WriteDir(cas, afero.NewReadOnlyFs(afero.NewOsFs()), *inputDir, nil)
+	if err != nil {
+		log.Fatal("Unable to save dir to dbfs", err)
 	}
 	writeRef(os.Stdout, &ref)
 }
