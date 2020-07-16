@@ -6,8 +6,10 @@ package webdav
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
+	"github.com/andrebq/dbfs/internal/authfs"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"golang.org/x/net/webdav"
@@ -23,8 +25,9 @@ type (
 	server struct {
 		srv *webdav.Handler
 
-		authfs afero.Fs
+		auth   *authfs.Catalog
 		datafs afero.Fs
+		prefix string
 	}
 )
 
@@ -51,14 +54,15 @@ func (c *Config) apply(s *server) error {
 	if c.rootfs == nil {
 		return ErrMissingRootFS
 	}
-	s.authfs = afero.NewBasePathFs(c.rootfs, "auth")
+	s.auth = authfs.Open(afero.NewBasePathFs(c.rootfs, "auth"))
 	s.datafs = afero.NewBasePathFs(c.rootfs, "data")
 	s.srv = &webdav.Handler{
-		Prefix:     c.prefix,
-		FileSystem: newDir(s.datafs, s.authfs),
+		Prefix:     "",
+		FileSystem: newDir(s.datafs),
 		LockSystem: webdav.NewMemLS(),
 		Logger:     s.logRequests,
 	}
+	s.prefix = c.prefix
 	return nil
 }
 
@@ -69,18 +73,35 @@ func NewServer(c Config) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s, nil
+	return http.StripPrefix(c.prefix, s), nil
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err := s.authorize(req); err != nil {
 		s.renderErr(w, req, err)
+		return
 	}
 	s.srv.ServeHTTP(w, req)
 }
 
 func (s *server) authorize(req *http.Request) error {
-	return errors.New("not implemented")
+	user, pwd, contains := req.BasicAuth()
+	if !contains {
+		return authRequired{realm: fmt.Sprintf("%v-webdav", req.Host)}
+	}
+	ok, err := s.auth.Authenticate(user, []byte(pwd))
+	if err != nil {
+		log.Error().Err(err).Msg("error authenticating request")
+		return httpError{
+			cause:  err,
+			msg:    "internal error",
+			status: http.StatusInternalServerError,
+		}
+	}
+	if !ok {
+		return authRequired{realm: fmt.Sprintf("%v-webdav", req.Host)}
+	}
+	return nil
 }
 
 func (s *server) renderErr(w http.ResponseWriter, req *http.Request, err error) {

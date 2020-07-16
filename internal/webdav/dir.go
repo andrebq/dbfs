@@ -3,6 +3,7 @@ package webdav
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/afero"
 	"golang.org/x/net/webdav"
@@ -10,34 +11,32 @@ import (
 
 type (
 	dir struct {
-		users afero.Fs
-		data  afero.Fs
+		data afero.Fs
 	}
 )
 
-func newDir(data, auth afero.Fs) webdav.FileSystem {
+func newDir(data afero.Fs) webdav.FileSystem {
 	return &dir{
-		users: auth,
-		data:  data,
+		data: data,
 	}
 }
 
 func (d *dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
-	return nil
+	return d.data.Mkdir(filepath.FromSlash(name), perm)
 }
 
 func (d *dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
-	return nil, nil
+	return d.data.OpenFile(filepath.FromSlash(name), flag, perm)
 }
 
 func (d *dir) RemoveAll(ctx context.Context, name string) error {
-	return nil
+	return d.data.RemoveAll(filepath.FromSlash(name))
 }
 
 func (d *dir) Rename(ctx context.Context, oldName, newName string) error {
-	return nil
+	return d.data.Rename(filepath.FromSlash(oldName), filepath.FromSlash(newName))
 }
 
 func (d *dir) Stat(ctx context.Context, name string) (os.FileInfo, error) {
-	return nil, nil
+	return d.data.Stat(filepath.FromSlash(name))
 }
