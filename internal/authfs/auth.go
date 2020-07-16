@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/andrebq/dbfs/internal/cborfs"
+	"github.com/asaskevich/govalidator"
 	"github.com/spf13/afero"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -33,6 +34,11 @@ func Open(fs afero.Fs) *Catalog {
 // Authenticate returns true only, and only if, the username and password
 // pair are correct
 func (c *Catalog) Authenticate(name string, password []byte) (bool, error) {
+	if !govalidator.IsASCII(name) {
+		// TODO(andre): lift this restriction to allow for anything that is
+		// a valid email address (without host)
+		return false, errors.New("name must be a valid ASCII character")
+	}
 	if len(name) == 0 || len(password) == 0 {
 		return false, nil
 	}
@@ -56,6 +62,11 @@ func (c *Catalog) Authenticate(name string, password []byte) (bool, error) {
 
 // Register adds the given username into the catalog
 func (c *Catalog) Register(name string, password []byte) error {
+	if !govalidator.IsASCII(name) {
+		// TODO(andre): lift this restriction to allow for anything that is
+		// a valid email address (without host)
+		return errors.New("name must be a valid ASCII character")
+	}
 	if len(name) == 0 || len(password) == 0 {
 		return errors.New("missing username and password")
 	}

@@ -3,9 +3,18 @@
 build:
 	go build ./...
 
-dist:
+test: build
+	go test ./...
+
+dist: test
 	go build -o dist/webdav ./cmd/webdav
 	go build -o dist/dbfs ./cmd/dbfs
+	go build -o dist/authfs-adduser ./cmd/authfs-adduser
+
+dist-win: test
+	go build -o dist/webdav.exe ./cmd/webdav
+	go build -o dist/dbfs.exe ./cmd/dbfs
+	go build -o dist/authfs-adduser.exe ./cmd/authfs-adduser
 
 tidy: build
 	go fmt ./...

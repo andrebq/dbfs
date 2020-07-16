@@ -7,9 +7,14 @@ package webdav
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net/http"
+	"path"
+	"sync"
+	"time"
 
 	"github.com/andrebq/dbfs/internal/authfs"
+	"github.com/gosimple/slug"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/afero"
 	"golang.org/x/net/webdav"
@@ -22,12 +27,17 @@ type (
 		prefix string
 	}
 
-	server struct {
-		srv *webdav.Handler
+	userPartition struct {
+		server webdav.Handler
+	}
 
+	server struct {
+		sync.Mutex
 		auth   *authfs.Catalog
 		datafs afero.Fs
 		prefix string
+
+		users map[string]*userPartition
 	}
 )
 
@@ -55,13 +65,8 @@ func (c *Config) apply(s *server) error {
 		return ErrMissingRootFS
 	}
 	s.auth = authfs.Open(afero.NewBasePathFs(c.rootfs, "auth"))
-	s.datafs = afero.NewBasePathFs(c.rootfs, "data")
-	s.srv = &webdav.Handler{
-		Prefix:     "",
-		FileSystem: newDir(s.datafs),
-		LockSystem: webdav.NewMemLS(),
-		Logger:     s.logRequests,
-	}
+	s.datafs = afero.NewBasePathFs(c.rootfs, "files")
+	s.users = make(map[string]*userPartition)
 	s.prefix = c.prefix
 	return nil
 }
@@ -77,36 +82,60 @@ func NewServer(c Config) (http.Handler, error) {
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if err := s.authorize(req); err != nil {
+	var up *userPartition
+	if user, err := s.authorize(req); err != nil {
 		s.renderErr(w, req, err)
 		return
+	} else {
+		s.Lock()
+		up = s.users[user]
+		if up == nil {
+			up = &userPartition{
+				server: webdav.Handler{
+					FileSystem: newDir(afero.NewBasePathFs(s.datafs, path.Clean(slug.Make(user)))),
+					LockSystem: webdav.NewMemLS(),
+					Logger:     s.logRequests,
+				},
+			}
+			s.users[user] = up
+		}
+		s.Unlock()
 	}
-	s.srv.ServeHTTP(w, req)
+	up.server.ServeHTTP(w, req)
 }
 
-func (s *server) authorize(req *http.Request) error {
+func (s *server) authorize(req *http.Request) (string, error) {
 	user, pwd, contains := req.BasicAuth()
 	if !contains {
-		return authRequired{realm: fmt.Sprintf("%v-webdav", req.Host)}
+		return "", authRequired{realm: fmt.Sprintf("%v-webdav", req.Host)}
 	}
 	ok, err := s.auth.Authenticate(user, []byte(pwd))
 	if err != nil {
 		log.Error().Err(err).Msg("error authenticating request")
-		return httpError{
+		return "", httpError{
 			cause:  err,
 			msg:    "internal error",
 			status: http.StatusInternalServerError,
 		}
 	}
 	if !ok {
-		return authRequired{realm: fmt.Sprintf("%v-webdav", req.Host)}
+		return "", authRequired{realm: fmt.Sprintf("%v-webdav", req.Host)}
 	}
-	return nil
+	return user, nil
 }
 
 func (s *server) renderErr(w http.ResponseWriter, req *http.Request, err error) {
 	// TODO(andre) add sampled log here as this is user driven
-	log.Error().Err(err).Send()
+	tick := time.Now().Unix() ^ rand.Int63()
+	log.Error().Int64("err-token", tick).Err(err).Send()
+	if render, ok := err.(interface {
+		Render(http.ResponseWriter, *http.Request)
+	}); ok {
+		render.Render(w, req)
+		return
+	}
+
+	http.Error(w, fmt.Sprintf("Unexpected error (error token: %v)", tick), http.StatusInternalServerError)
 }
 
 func (s *server) logRequests(req *http.Request, err error) {

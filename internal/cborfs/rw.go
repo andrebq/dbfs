@@ -26,6 +26,12 @@ func ReadFile(out interface{}, fs afero.Fs, file string) error {
 // Overwrite the file (or create a new one if needed). mode is only used if the file
 // is new, otherwise, it is ignored.
 func Overwrite(fs afero.Fs, file string, mode os.FileMode, input interface{}) error {
+	file = filepath.FromSlash(path.Clean(file))
+	dir := filepath.Dir(file)
+	err := fs.MkdirAll(dir, 0544)
+	if err != nil {
+		return fmt.Errorf("unable to create directory for %v: %w", file, err)
+	}
 	vfile, err := fs.OpenFile(filepath.FromSlash(path.Clean(file)), os.O_WRONLY|os.O_CREATE, mode)
 	if err != nil {
 		return fmt.Errorf("unable to open/crete file %v for writing (%v): %w", file, mode, err)

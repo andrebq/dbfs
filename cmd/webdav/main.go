@@ -20,6 +20,7 @@ var (
 )
 
 func main() {
+	flag.Parse()
 	cfg := webdav.Config{}.
 		WithRootFS(afero.NewBasePathFs(afero.NewOsFs(), filepath.Clean(*rootDir))).
 		WithPrefix(*prefix)

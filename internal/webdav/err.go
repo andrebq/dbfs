@@ -2,6 +2,7 @@ package webdav
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -39,7 +40,7 @@ func (a authRequired) Error() string {
 }
 
 func (a authRequired) Render(w http.ResponseWriter, req *http.Request) {
-	w.Header().Add("WWW-Authenticate", a.realm)
+	w.Header().Add("WWW-Authenticate", fmt.Sprintf("Basic realm=%v, charset=utf-8", a.realm))
 	w.WriteHeader(http.StatusUnauthorized)
 	io.WriteString(w, "please authenticate")
 }
