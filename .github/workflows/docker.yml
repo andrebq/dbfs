@@ -1,0 +1,29 @@
+name: Docker
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: crazy-max/ghaction-docker-buildx@v3
+      with:
+        buildx-version: latest
+        qemu-version: latest
+    - name: Run Buildx
+      run: |
+        docker buildx build \
+          --platform linux/386,linux/amd64,linux/arm64,linux/ppc64le,linux/s390x \
+          --output "type=image,push=false" \
+          -t andrebq/dbfs:latest
+          -f ./Dockerfile \
+          . \
