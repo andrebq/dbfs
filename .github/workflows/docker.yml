@@ -24,6 +24,6 @@ jobs:
         docker buildx build \
           --platform linux/386,linux/amd64,linux/arm64,linux/ppc64le,linux/s390x \
           --output "type=image,push=false" \
-          -t andrebq/dbfs:latest
+          -t andrebq/dbfs:latest \
           -f ./Dockerfile \
           . \
