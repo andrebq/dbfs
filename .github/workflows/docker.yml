@@ -26,4 +26,22 @@ jobs:
           --output "type=image,push=false" \
           -t andrebq/dbfs:latest \
           -f ./Dockerfile \
-          . \
+          .
+
+    - name: Docker Login
+      if: success()
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      run: |
+        echo "${DOCKER_PASSWORD}" | docker login --username "${DOCKER_USERNAME}" --password-stdin
+
+    - name: Docker Buildx (push)
+      if: success()
+      run: |
+        docker buildx build \
+          --platform linux/amd64,linux/arm64\
+          --output "type=image,push=true" \
+          -t andrebq/dbfs:latest \
+          -f ./Dockerfile \
+          .
