@@ -22,7 +22,7 @@ jobs:
     - name: Run Buildx
       run: |
         docker buildx build \
-          --platform linux/amd64,linux/arm64\
+          --platform linux/amd64,linux/arm64,linux/arm/v7\
           --output "type=image,push=false" \
           -t andrebq/dbfs:latest \
           -f ./Dockerfile \
@@ -40,7 +40,7 @@ jobs:
       if: success()
       run: |
         docker buildx build \
-          --platform linux/amd64,linux/arm64\
+          --platform linux/amd64,linux/arm64,linux/arm/v7\
           --output "type=image,push=true" \
           -t andrebq/dbfs:latest \
           -f ./Dockerfile \
