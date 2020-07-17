@@ -10,6 +10,7 @@ dist: test
 	go build -o dist/webdav ./cmd/webdav
 	go build -o dist/dbfs ./cmd/dbfs
 	go build -o dist/authfs-adduser ./cmd/authfs-adduser
+	cp bash/entrypoint.sh dist/entrypoint.sh
 
 dist-win: test
 	go build -o dist/webdav.exe ./cmd/webdav
