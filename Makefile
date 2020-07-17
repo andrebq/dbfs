@@ -6,7 +6,7 @@ build:
 test: build
 	go test ./...
 
-dist: test
+dist: build
 	go build -o dist/webdav ./cmd/webdav
 	go build -o dist/dbfs ./cmd/dbfs
 	go build -o dist/authfs-adduser ./cmd/authfs-adduser

@@ -4,7 +4,7 @@ set -eou pipefail
 function run-cmd {
     declare -r cmd=${1}
     shift
-    "${1}" "${@}"
+    "${cmd}" "${@}"
 }
 
 case $# in
