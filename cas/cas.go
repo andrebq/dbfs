@@ -96,6 +96,11 @@ func (c *C) PutContent(ctx context.Context, content io.Reader) (Ref, error) {
 	return ref, nil
 }
 
+// Exists returns true if the ref already exists
+func (c *C) Exists(ctx context.Context, ref Ref) (bool, error) {
+	return c.dataTable.Exists(ctx, path.Join(c.dataPath, ref.HexPath(c.hexDirCount)))
+}
+
 // Get writes the object at ref to the given output
 // it returns the underlying KV error without any modification
 func (c *C) GetContent(ctx context.Context, w io.Writer, ref Ref) error {

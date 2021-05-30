@@ -1,10 +1,12 @@
 package cas
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"hash"
 	"io"
+	"io/ioutil"
 	"strings"
 	"sync"
 )
@@ -66,6 +68,14 @@ func RefCalculator(out *Ref, content io.Reader) io.Reader {
 		actual: content,
 		hasher: h,
 	}
+}
+
+// PrecomputeHashBytes returns the expected Ref value for the
+// given set of bytes
+func PrecomputeHashBytes(buf []byte) (ref Ref) {
+	rc := RefCalculator(&ref, bytes.NewBuffer(buf))
+	io.Copy(ioutil.Discard, rc)
+	return
 }
 
 func (r *refCalculator) Read(buf []byte) (int, error) {
