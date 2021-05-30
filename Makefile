@@ -2,10 +2,12 @@
 
 OS?=UnixFamily
 
+include Env-Common.mk
 include Env-$(OS).mk
+include SupportApps.mk
 
 test:
-	go build ./...
+	go test ./...
 
 tidy: build
 	go fmt ./...
@@ -15,5 +17,4 @@ watch:
 	modd
 
 dist:
-	mkdir -p $(DIST_FOLDER)
 	go build -o $(DIST_BINARY_FILE) ./cmd/dbfs
