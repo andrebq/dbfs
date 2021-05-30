@@ -9,15 +9,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gocloud.dev/blob"
-	"gocloud.dev/gcerrors"
 )
 
 type (
 	// C implements the CAS abstraction on top of a
 	// S3 compatible storage
 	C struct {
-		dataBucket *blob.Bucket
+		dataTable KV
 
 		dataPath, tempPath string
 		rootTmpUUIDs       uuid.UUID
@@ -30,11 +28,11 @@ type (
 	// any object
 	Ref [32]byte
 
-	// NewBucket should return a blob.Bucket object with the provided
-	// prefix.
+	// NewTable should return a KV object which is used to
+	// store the items
 	//
-	// cas package is responsible for closing the bucket
-	NewBucket func(context.Context) (*blob.Bucket, error)
+	// cas package is responsible for closing the KV
+	NewTable func(context.Context) (KV, error)
 )
 
 var (
@@ -43,7 +41,7 @@ var (
 )
 
 // Open a new CAS store using newBucket to acquire the remote item
-func Open(ctx context.Context, newBucket NewBucket) (*C, error) {
+func Open(ctx context.Context, newBucket NewTable) (*C, error) {
 	var c C
 	c.dataPath = path.Join("data")
 	c.tempPath = path.Join("tmp")
@@ -57,7 +55,7 @@ func Open(ctx context.Context, newBucket NewBucket) (*C, error) {
 	tmpBucket := uuid.NewSHA1(uuidTmpBucket, nowInBytes[:])
 
 	return &C{
-		dataBucket:   bucket,
+		dataTable:    bucket,
 		rootTmpUUIDs: tmpBucket,
 		hexDirCount:  4,
 	}, nil
@@ -66,32 +64,32 @@ func Open(ctx context.Context, newBucket NewBucket) (*C, error) {
 // PutContent writes content to a temporary object and later copies that object
 // to the final path under the sha256 hash.
 //
-// This avoids reading the object twice but might incur in costs on S3 service,
-// the temporary object remains alive only for a short period of time.
+// This avoids reading the object twice but might incur in costs
+// on S3-like services, even though the temporary object is alive
+// for a short period of time.
 //
-// TODO: use interfaces and check if the Move operation is supproted, in most
-// providers, moving is cheaper tha copy/delete.
+// This function does not perform deduplication, so if the content already
+// exists, it will be re-uploaded. The Copy/Move operation wont be executed
+// in this scenario.
+//
+// If the provided KV object implementes the Mover interface, then instead
+// of Copy/Delete cas will use the Move operation.
 func (c *C) PutContent(ctx context.Context, content io.Reader) (Ref, error) {
 	var counterInBytes [8]byte
 	c.objCount++
 	uint64Bytes(&counterInBytes, c.objCount)
 	tmpIdentity := uuid.NewSHA1(c.rootTmpUUIDs, counterInBytes[:])
 	tmpPath := path.Join(c.tempPath, tmpIdentity.String())
-	writer, err := c.dataBucket.NewWriter(ctx, tmpPath, &blob.WriterOptions{})
-	if err != nil {
-		return Ref{}, err
-	}
 	var ref Ref
-	_, err = writer.ReadFrom(RefCalculator(&ref, content))
+	_, err := c.dataTable.Write(ctx, tmpPath, RefCalculator(&ref, content))
 	if err != nil {
-		writer.Close()
 		return Ref{}, err
 	}
-	writer.Close()
-
 	finalPath := path.Join(c.dataPath, ref.HexPath(c.hexDirCount))
-
-	err = c.dataBucket.Copy(ctx, finalPath, tmpPath, &blob.CopyOptions{})
+	if exists, _ := c.dataTable.Exists(ctx, finalPath); exists {
+		return ref, nil
+	}
+	err = move(ctx, c.dataTable, finalPath, tmpPath)
 	if err != nil {
 		return Ref{}, fmt.Errorf("unable to copy %v to %v, cause: %w", tmpPath, finalPath, err)
 	}
@@ -99,29 +97,16 @@ func (c *C) PutContent(ctx context.Context, content io.Reader) (Ref, error) {
 }
 
 // Get writes the object at ref to the given output
-// or returns ErrNotFound if the reference is invalid
+// it returns the underlying KV error without any modification
 func (c *C) GetContent(ctx context.Context, w io.Writer, ref Ref) error {
 	finalPath := path.Join(c.dataPath, ref.HexPath(c.hexDirCount))
-	reader, err := c.dataBucket.NewReader(ctx, finalPath, &blob.ReaderOptions{})
-	if err != nil {
-		switch gcerrors.Code(err) {
-		case gcerrors.NotFound:
-			return ErrNotFound
-		default:
-			return err
-		}
-	}
-	defer reader.Close()
-	_, err = io.Copy(w, reader)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := c.dataTable.Read(ctx, w, finalPath)
+	return err
 }
 
 // Close the underlying bucket
 func (c *C) Close() error {
-	errData := c.dataBucket.Close()
+	errData := c.dataTable.Close()
 	if errData != nil {
 		return fmt.Errorf("unable to close data bucket, cause: %w", errData)
 	}

@@ -7,15 +7,10 @@ import (
 	"testing"
 
 	"github.com/andrebq/dbfs/internal/testutil"
-	"gocloud.dev/blob"
 )
 
-func TestCAS(t *testing.T) {
-	ctx := context.Background()
-
-	cas, err := Open(ctx, func(ctx context.Context) (*blob.Bucket, error) {
-		return testutil.MemoryBucket(ctx, t), nil
-	})
+func sanityCheckCAS(t *testing.T, ctx context.Context, newkv NewTable) {
+	cas, err := Open(ctx, newkv)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,4 +32,14 @@ func TestCAS(t *testing.T) {
 	} else if !bytes.Equal(buf.Bytes(), []byte("abc123")) {
 		t.Errorf("Unexpected content from buffer: %v", buf.String())
 	}
+}
+
+func TestCAS(t *testing.T) {
+	sanityCheckCAS(t, context.Background(), func(ctx context.Context) (KV, error) {
+		return testutil.MemoryBucket(ctx, t), nil
+	})
+	// run twice so we can check if the exists short-circuit works
+	sanityCheckCAS(t, context.Background(), func(ctx context.Context) (KV, error) {
+		return testutil.MemoryBucket(ctx, t), nil
+	})
 }

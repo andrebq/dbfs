@@ -1,4 +1,4 @@
-.PHONY: build tidy watch dist
+.PHONY: build tidy watch dist test test-minio ll-tests
 
 OS?=UnixFamily
 
@@ -8,6 +8,16 @@ include SupportApps.mk
 
 test:
 	go test ./...
+
+test-minio:
+	AWS_ACCESS_KEY_ID=dbfs-dev \
+	AWS_SECRET_ACCESS_KEY=dbfs-dev \
+	DBFS_MINIO_ENDPOINT=localhost:9000 \
+	DBFS_BUCKET=dbfs-data \
+	AWS_DEFAULT_REGION=us-east-1 \
+		go test --tags minio_driver ./...
+
+all-tests: test test-minio
 
 tidy: build
 	go fmt ./...
