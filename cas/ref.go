@@ -23,6 +23,21 @@ type (
 		out    *Ref
 		hasher hash.Hash
 	}
+
+	// RollingRef computes a ref value as bytes are written to it
+	// it is just a wraper over a hash.Hash
+	RollingRef interface {
+		io.WriteCloser
+		io.ByteWriter
+		Ref() Ref
+		Reset()
+	}
+
+	rollingRef struct {
+		hasher  hash.Hash
+		onebyte []byte
+		ref     Ref
+	}
 )
 
 var (
@@ -60,13 +75,23 @@ func (r Ref) String() string {
 //
 // The Ref *pointer is updated when content.Read returns 0
 // bytes or an error is found, including io.EOF
-func RefCalculator(out *Ref, content io.Reader) io.Reader {
+func RefCalculator(out *Ref, content io.Reader) io.ReadCloser {
 	h := sha256Pool.Get().(hash.Hash)
 	h.Reset()
 	return &refCalculator{
 		out:    out,
 		actual: content,
 		hasher: h,
+	}
+}
+
+// NewRollingRef configures a new rolling hash object
+func NewRollingRef() RollingRef {
+	hasher := sha256Pool.Get().(hash.Hash)
+	hasher.Reset()
+	return &rollingRef{
+		hasher:  hasher,
+		onebyte: make([]byte, 1),
 	}
 }
 
@@ -86,4 +111,36 @@ func (r *refCalculator) Read(buf []byte) (int, error) {
 		r.hasher.Write(buf[:n])
 	}
 	return n, err
+}
+
+func (r *refCalculator) Close() error {
+	sha256Pool.Put(r.hasher)
+	if closer, ok := r.actual.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
+}
+
+func (rr *rollingRef) Write(b []byte) (int, error) {
+	return rr.hasher.Write(b)
+}
+
+func (rr *rollingRef) WriteByte(b byte) error {
+	rr.onebyte[0] = b
+	_, err := rr.hasher.Write(rr.onebyte)
+	return err
+}
+
+func (rr *rollingRef) Ref() Ref {
+	rr.hasher.Sum(rr.ref[:0])
+	return rr.ref
+}
+
+func (rr *rollingRef) Close() error {
+	sha256Pool.Put(rr.hasher)
+	return nil
+}
+
+func (rr *rollingRef) Reset() {
+	rr.hasher.Reset()
 }

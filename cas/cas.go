@@ -81,7 +81,9 @@ func (c *C) PutContent(ctx context.Context, content io.Reader) (Ref, error) {
 	tmpIdentity := uuid.NewSHA1(c.rootTmpUUIDs, counterInBytes[:])
 	tmpPath := path.Join(c.tempPath, tmpIdentity.String())
 	var ref Ref
-	_, err := c.dataTable.Write(ctx, tmpPath, RefCalculator(&ref, content))
+	rc := RefCalculator(&ref, content)
+	defer rc.Close()
+	_, err := c.dataTable.Write(ctx, tmpPath, rc)
 	if err != nil {
 		return Ref{}, err
 	}

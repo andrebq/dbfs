@@ -26,7 +26,19 @@ func TestBlob(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("refs: %v", refs)
-	t.Fail()
+
+	chunks, err := blob.Chunks(ctx, bytes.NewBuffer(largeRandomBuf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chunks) != len(refs) {
+		t.Errorf("Got %v refs but only %v chunks", len(refs), len(chunks))
+	}
+	for i, c := range chunks {
+		if !bytes.Equal(c.Ref[:], refs[i][:]) {
+			t.Errorf("For chunk %v with values %v uploaded ref %v", i, c, refs[i])
+		}
+	}
 }
 
 func getRandom(t *testing.T, seed int64, size int) []byte {
