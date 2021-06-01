@@ -5,6 +5,7 @@ OS?=UnixFamily
 include Env-Common.mk
 include Env-$(OS).mk
 include SupportApps.mk
+include LocalDevTasks.mk
 
 test:
 	go test ./...

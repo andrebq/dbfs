@@ -14,3 +14,8 @@ $(MINIO_DOCKER_VOLUME):
 MINIO_DOCKER_CLIENT_VOLUME?=$(PWD)/localfiles/minio-client/root-home
 $(MINIO_DOCKER_CLIENT_VOLUME):
 	mkdir -p $(MINIO_DOCKER_CLIENT_VOLUME)
+
+## LocalDevTasks Env
+LOCALFILES_RANDOM_BLOB?=$(PWD)/localfiles/random-blobs
+$(LOCALFILES_RANDOM_BLOB):
+	mkdir -p $(LOCALFILES_RANDOM_BLOB)

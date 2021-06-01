@@ -133,12 +133,12 @@ func (b *B) Chunks(ctx context.Context, input io.Reader) ([]Chunk, error) {
 		if (hasher.Sum64()&CutPoint) == 0 ||
 			lastChunk.Size == maxChunkSize {
 			lastChunk.End = lastChunk.Start + int64(lastChunk.Size)
+			lastChunk.Ref = rr.Ref()
+			chunks = append(chunks, lastChunk)
+			rr.Reset()
+			lastChunk.Size = 0
 			lastChunk.Start = lastChunk.End
 			lastChunk.End = lastChunk.Start
-			lastChunk.Ref = rr.Ref()
-			lastChunk.Size = 0
-			rr.Reset()
-			chunks = append(chunks, lastChunk)
 		}
 	}
 

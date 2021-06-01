@@ -26,11 +26,12 @@ func blobCmd() *cli.Command {
 func blobChunkSubcommand(cfg *config.Blob) *cli.Command {
 	var fileName string
 	return &cli.Command{
-		Name:  "chunk",
+		Name:  "chunks",
 		Usage: "Take a file input (or stdin by default) and writes to stdout the chunks for that file",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "file",
+				Aliases:     []string{"i"},
 				Value:       "-",
 				Usage:       "File to read as input (stdin is default)",
 				Destination: &fileName,
