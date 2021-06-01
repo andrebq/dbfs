@@ -9,4 +9,5 @@ require (
 	github.com/rs/zerolog v1.22.0
 	github.com/urfave/cli/v2 v2.3.0
 	gocloud.dev v0.23.0
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
