@@ -1,9 +1,5 @@
 .PHONY: generate-random-blob
 
-randomTestFile=$(LOCALFILES_RANDOM_BLOB)/random.blob
-changedTestFile=$(LOCALFILES_RANDOM_BLOB)/random-changed.blob
-diffChunksOriginal=$(LOCALFILES_RANDOM_BLOB)/refs.original
-diffChunksChanged=$(LOCALFILES_RANDOM_BLOB)/refs.changed
 $(randomTestFile): $(LOCALFILES_RANDOM_BLOB)
 	dd if=/dev/random of=$(randomTestFile) bs=1024 count=50000
 
@@ -18,8 +14,8 @@ print-chunks: dist $(file)
 	./dist/dbfs -o human blob chunks -i $(file)
 
 diff-chunks: dist $(randomTestFile) $(changedTestFile)
-	./dist/dbfs -o json-lines blob chunks -i $(randomTestFile) | jq '.chunks[].ref' > $(diffChunksOriginal)
-	./dist/dbfs -o json-lines blob chunks -i $(changedTestFile) | jq '.chunks[].ref' > $(diffChunksChanged)
-	diff -u $(diffChunksOriginal) $(diffChunksChanged)
+	./dist/dbfs -o json-lines blob chunks -i $(randomTestFile) | jq -c '.chunks[] | {start: .start, ref: .ref}' > $(diffChunksOriginal)
+	./dist/dbfs -o json-lines blob chunks -i $(changedTestFile) | jq -c '.chunks[] | {start: .start, ref: .ref}' > $(diffChunksChanged)
+	diff -u $(diffChunksOriginal) $(diffChunksChanged) || { true; }
 
 change-bytes: $(changedTestFile)
