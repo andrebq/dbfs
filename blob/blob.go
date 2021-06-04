@@ -17,6 +17,17 @@ type (
 		hashes sync.Pool
 	}
 
+	// Tree is the starting point which is used to track the content
+	// of a given blob.
+	//
+	// Since actual content might be larger than one chunk, a Tree
+	// contains a list of Branches (cas.Ref's to other tree objects)
+	// or a list of Leaves (cas.Ref's to raw content).
+	Tree struct {
+		Branches []cas.Ref
+		Leaves   []cas.Ref
+	}
+
 	// Chunk contains a sequence of bytes whose hash value
 	// matches the CutPoint
 	Chunk struct {

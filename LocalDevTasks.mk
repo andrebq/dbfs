@@ -14,8 +14,8 @@ print-chunks: dist $(file)
 	./dist/dbfs -o human blob chunks -i $(file)
 
 diff-chunks: dist $(randomTestFile) $(changedTestFile)
-	./dist/dbfs -o json-lines blob chunks -i $(randomTestFile) | jq -c '.chunks[] | {start: .start, ref: .ref}' > $(diffChunksOriginal)
-	./dist/dbfs -o json-lines blob chunks -i $(changedTestFile) | jq -c '.chunks[] | {start: .start, ref: .ref}' > $(diffChunksChanged)
+	./dist/dbfs -o json blob chunks -i $(randomTestFile) | jq -c '.[] | {start: .start, ref: .ref}' > $(diffChunksOriginal)
+	./dist/dbfs -o json blob chunks -i $(changedTestFile) | jq -c '.[] | {start: .start, ref: .ref}' > $(diffChunksChanged)
 	diff -u $(diffChunksOriginal) $(diffChunksChanged) || { true; }
 
 change-bytes: $(changedTestFile)

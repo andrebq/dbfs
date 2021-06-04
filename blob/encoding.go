@@ -1,6 +1,10 @@
 package blob
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/andrebq/dbfs/internal/tuple"
+)
 
 func (c Chunk) MarshalYAML() (interface{}, error) {
 	return struct {
@@ -28,4 +32,13 @@ func (c Chunk) MarshalJSON() ([]byte, error) {
 		Size:  int64(c.Size),
 		Ref:   c.Ref.String(),
 	})
+}
+
+func (c Chunk) MarshalBinary() ([]byte, error) {
+	return tuple.MarshalBinary(tuple.Pairs{}.Add("start", c.Start).Add("end", c.End).Add("size", c.Size).Add("ref", c.Ref).Named())
+}
+
+func (t Tree) MarshalBinary() ([]byte, error) {
+	tup := tuple.Pairs{}.Add("leaves", t.Leaves).Add("branches", t.Branches).Named()
+	return tuple.MarshalBinary(tup)
 }

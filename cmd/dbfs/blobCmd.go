@@ -60,11 +60,7 @@ func blobChunkSubcommand(cfg *config.Blob) *cli.Command {
 			if err != nil {
 				return err
 			}
-			return output.FormatOne(os.Stdout, struct {
-				Chunks []blob.Chunk `json:"chunks" yaml:"chunks"`
-			}{
-				Chunks: chunks,
-			})
+			return output.Format(os.Stdout, chunks)
 		},
 	}
 }
